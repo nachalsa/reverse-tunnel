@@ -1,5 +1,3 @@
-/target-server/config/tunnel.conf
-
 # OS 및 에디터 생성 파일
 .DS_Store
 *.swp

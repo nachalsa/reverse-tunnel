@@ -2,7 +2,7 @@
 
 이 저장소는 공인 IP가 없는 사설망의 서버를 외부에서 접속할 수 있도록, 역방향 SSH 터널을 자동으로 설정하고 관리하는 모든 코드와 문서를 제공합니다.
 
-이 문서 하나만 처음부터 끝까지 따라 하면, 복잡한 네트워크 지식 없이도 재부팅 후에도 자동으로 복구되는 안정적인 원격 접속 환경을 구축할 수 있습니다.
+양쪽 서버 모두 간단한 설정 파일 수정과 스크립트 실행만으로, 재부팅 후에도 자동으로 복구되는 안정적인 원격 접속 환경을 구축할 수 있습니다.
 
 ## 목차
 
@@ -28,7 +28,7 @@
    (ssh, web 등)       (요청 중계)                  (내부에서 외부로 연결)      (실제 작업 서버)
 ```
 
--   **① Middle Server (공인 IP 서버):** 공인 IP를 가지고 있어 외부에서 접근 가능한 '관문' 역할을 합니다. (예: 클라우드 VPS, **공인 IP를 가진 라즈베리파이**)
+-   **① Middle Server (공인 IP 서버):** 공인 IP를 가지고 있어 외부에서 접근 가능한 '관문' 역할을 합니다. (예: 클라우드 VPS, 공인 IP를 가진 라즈베리파이)
 -   **③ Target Server (사설망 서버):** 외부에서 직접 접속할 수 없는, 우리가 최종적으로 접속하고 싶은 서버입니다. 이 서버가 먼저 **② SSH 터널**이라는 통로를 Middle Server로 뚫어놓고 계속 유지합니다.
 -   **결과:** 인터넷 사용자는 Middle Server의 특정 포트로 접속하지만, 실제로는 터널을 통해 Target Server와 통신하게 됩니다.
 
@@ -46,32 +46,37 @@
 
 ### Step 1: Middle Server 환경 설정 (공인 IP 서버)
 
-Middle Server에 접속하여, Target Server로부터의 터널 연결을 수신할 환경을 구성합니다.
+Middle Server에 접속하여, 아래 절차에 따라 자동화 스크립트를 실행하면 필요한 모든 설정이 완료됩니다.
 
-#### 1-1. 저장소 클론
-
-```bash
-git clone https://github.com/your-username/reverse-ssh-tunnel.git  # 본인의 저장소 주소로 변경
-cd reverse-ssh-tunnel
-```
-
-#### 1-2. 자동화 스크립트 실행
-
-`provision.sh` 스크립트는 터널용 사용자 생성, SSH 설정, 방화벽 규칙 추가를 자동으로 처리합니다.
--   **사용 형식:** `sudo ./middle-server/scripts/provision.sh <사용자이름> <외부포트1> <외부포트2> ...`
--   **실행 예시:** `tunnel`이라는 사용자를 만들고, `22222`번 포트를 외부 터널용으로 열고 싶다면 아래와 같이 실행합니다.
+#### 1-1. 저장소 클론 및 디렉토리 이동
 
 ```bash
-# Middle Server의 관리용 SSH 포트가 22번이 아니라면, 먼저 해당 포트를 수동으로 열어주세요.
-# 예: sudo ufw allow 2222/tcp
-
-sudo ./middle-server/scripts/provision.sh tunnel 22222
+git clone https://github.com/your-username/reverse-tunnel.git
+cd reverse-tunnel
 ```
+
+#### 1-2. 설정 파일 준비
+
+`middle.conf.example` 파일을 `middle.conf`로 복사하고, 내용을 본인 환경에 맞게 수정합니다.
+
+```bash
+cp middle-server/config/middle.conf.example middle-server/config/middle.conf
+nano middle-server/config/middle.conf
+```
+파일 안의 주석을 참고하여 `TUNNEL_USER`와 `TUNNEL_PORTS_TO_OPEN` 항목을 올바르게 설정하세요. 이 포트 목록에는 Middle Server 관리용 SSH 포트와 터널로 외부에 노출할 모든 포트를 포함해야 합니다.
+
+#### 1-3. 자동화 스크립트 실행
+
+준비된 설정 파일을 바탕으로 `provision.sh` 스크립트를 `sudo` 권한으로 실행합니다.
+
+```bash
+sudo ./middle-server/scripts/provision.sh
+```
+이 스크립트는 설정 파일의 내용에 따라 사용자 생성, SSH 설정, 방화벽 규칙 추가를 자동으로 처리합니다.
 
 > **[중요] 1024 이하 포트 사용 시**
-> 터널용 외부 포트로 1024 이하(예: 22번)를 사용하려면, 일반 사용자가 해당 포트를 열 수 있도록 추가 권한 설정이 필요합니다.
+> 터널용 외부 포트로 1024 이하(예: 22번)를 사용하려면, Middle Server에서 추가 권한 설정이 필요합니다.
 > ```bash
-> # Middle Server에서 실행
 > sudo setcap 'cap_net_bind_service=+ep' $(which sshd)
 > ```
 
@@ -90,7 +95,7 @@ Target Server가 Middle Server에 비밀번호 없이 안전하게 접속할 수
     ```
 2.  **공개키 복사**: `cat ~/.ssh/id_ed25519_tunnel.pub` 명령으로 출력된 키 전체를 복사합니다.
 3.  **Middle Server에 공개키 등록**:
-    -   Middle Server에 `tunnel` 사용자로 접속합니다. (`ssh tunnel@<middle_ip> -p <관리용_ssh_포트>`)
+    -   Middle Server에 **Step 1에서 생성한 터널용 사용자**로 접속합니다.
     -   아래 명령 실행:
         ```bash
         mkdir -p ~/.ssh; chmod 700 ~/.ssh
@@ -127,8 +132,8 @@ Host pitunnel
 
 ```bash
 # Target Server에서 실행
-git clone https://github.com/your-username/reverse-ssh-tunnel.git
-cd reverse-ssh-tunnel
+git clone https://github.com/your-username/reverse-tunnel.git
+cd reverse-tunnel
 
 # 설정 파일 복사 및 수정
 cp target-server/config/tunnel.conf.example target-server/config/tunnel.conf
@@ -151,7 +156,6 @@ TUNNELS="22222:localhost:22"
 `setup.sh` 스크립트를 **터널을 실행할 사용자 계정(Step 2를 진행한 사용자)에서 `sudo`를 붙여 실행**합니다.
 
 ```bash
-# reverse-ssh-tunnel 디렉토리에서 실행
 sudo ./target-server/scripts/setup.sh
 ```
 스크립트가 모든 설정을 자동으로 완료합니다.
@@ -165,18 +169,8 @@ sudo ./target-server/scripts/setup.sh
 -   **Target Server:**
     -   이미 **Step 3**에서 `setup.sh`를 통해 `systemd` 서비스가 등록되었으므로, 재부팅 시 자동으로 터널 생성을 시도합니다. **추가 작업이 필요 없습니다.**
 
--   **Middle Server (라즈베리파이 등):**
-    -   SSH 서버와 방화벽이 부팅 시 자동으로 활성화되는지 확인해야 합니다.
-    ```bash
-    # Middle Server에서 실행
-
-    # 1. SSH 서버 자동 시작 활성화 (보통 이미 'enabled' 상태)
-    sudo systemctl enable sshd
-
-    # 2. 방화벽 자동 시작 활성화 (이미 'active' 상태면 OK)
-    sudo ufw enable
-    ```
-    위 두 가지가 확인되면 Middle Server도 재부팅 후 자동으로 제 역할을 수행할 준비가 된 것입니다.
+-   **Middle Server:**
+    -   **Step 1**에서 실행한 `provision.sh` 스크립트가 SSH 서버와 방화벽을 자동으로 활성화하고, 부팅 시 시작되도록 설정합니다. **추가 작업이 필요 없습니다.**
 
 ---
 
@@ -205,14 +199,11 @@ sudo ./target-server/scripts/setup.sh
 
 -   **서비스가 `activating (auto-restart)` 상태에서 벗어나지 못할 경우:**
     -   **Target Server**에서 `journalctl -u reverse-tunnel.service -f` 명령으로 실시간 로그를 확인하여 정확한 오류 메시지를 찾으세요.
-    -   `Error: remote port forwarding failed for listen port ...` 메시지가 보인다면, Middle Server의 포트 권한 문제 또는 방화벽 문제입니다.
+    -   `Error: remote port forwarding failed for listen port ...` 메시지가 보인다면, Middle Server의 포트 권한 문제 또는 방화벽 문제입니다. **Step 1**의 `TUNNEL_PORTS_TO_OPEN` 설정과 `setcap` 부분을 다시 확인하세요.
 
 ---
 
 ## 7. 디렉토리 구조 설명
 
--   **middle-server/**: 공인 IP를 가진 중계 서버의 자동 설정을 위한 스크립트와 문서.
+-   **middle-server/**: 공인 IP를 가진 중계 서버의 자동 설정을 위한 스크립트와 설정 파일.
 -   **target-server/**: 사설망에 위치한 목적 서버의 터널 자동 생성을 위한 스크립트와 설정 파일.
-  -   `config/`: 터널링 상세 설정 파일.
-  -   `systemd/`: 터널 자동 실행 및 유지를 위한 서비스 파일 템플릿.
-  -   `scripts/`: 터널 실행 및 자동 설치 스크립트.

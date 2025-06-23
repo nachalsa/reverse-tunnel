@@ -1,0 +1,15 @@
+[Unit]
+Description=Reverse SSH Tunnel Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# 이 값은 setup.sh 스크립트에 의해 자동으로 교체됩니다.
+User=__PLACEHOLDER_USER__
+
+ExecStart=/bin/bash -c 'exec /opt/reverse-tunnel/scripts/start-tunnel.sh'
+RestartSec=15
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

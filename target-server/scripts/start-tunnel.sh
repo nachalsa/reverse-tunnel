@@ -22,7 +22,8 @@ if [ -z "$SSH_REMOTE_OPTIONS" ]; then
     exit 1
 fi
 
-echo "Starting reverse SSH tunnel to ${MIDDLE_SERVER_USER}@${MIDDLE_SERVER_IP}..."
+echo "Starting reverse SSH tunnel to ${MIDDLE_SERVER_TUNNEL_USER="tunnel"
+}@${MIDDLE_SERVER_HOST_ALIAS}..."
 echo "Tunnels: ${TUNNELS}"
 
 # autossh 실행
@@ -35,4 +36,5 @@ echo "Tunnels: ${TUNNELS}"
     -o "ConnectTimeout=10" \
     -o "StrictHostKeyChecking=accept-new" \
     -N ${SSH_REMOTE_OPTIONS} \
-    "${MIDDLE_SERVER_USER}@${MIDDLE_SERVER_IP}"
+    "${MIDDLE_SERVER_TUNNEL_USER="tunnel"
+}@${MIDDLE_SERVER_HOST_ALIAS}"

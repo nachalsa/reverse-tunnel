@@ -28,11 +28,19 @@ if [ -z "$SSH_REMOTE_OPTIONS" ]; then
     exit 1
 fi
 
-/usr/bin/autossh -M 0 \
-    -o "ServerAliveInterval=30" \
-    -o "ServerAliveCountMax=3" \
-    -o "ExitOnForwardFailure=yes" \
-    -o "ConnectTimeout=10" \
-    -o "StrictHostKeyChecking=accept-new" \
-    -N ${SSH_REMOTE_OPTIONS} \
-    "${MIDDLE_SERVER_TUNNEL_USER}@${MIDDLE_SERVER_HOST_ALIAS}"
+# 최종적으로 실행될 명령어를 로그에 명확하게 남김
+COMMAND_TO_RUN="/usr/bin/autossh -M 0 -o \"ServerAliveInterval=30\" -o \"ServerAliveCountMax=3\" -o \"ExitOnForwardFailure=yes\" -o \"ConnectTimeout=10\" -o \"StrictHostKeyChecking=accept-new\" -N ${SSH_REMOTE_OPTIONS} \"${MIDDLE_SERVER_TUNNEL_USER}@${MIDDLE_SERVER_HOST_ALIAS}\""
+
+echo "--- [DEBUG] 최종 실행될 명령어 ---"
+echo "${COMMAND_TO_RUN}"
+echo "-----------------------------------"
+
+# --- 4. 명령어 실행 ---
+echo "--- [INFO] autossh 실행 시도 ---"
+eval ${COMMAND_TO_RUN}
+
+# autossh가 실패하면 종료 코드를 기록
+AUTOSSH_EXIT_CODE=$?
+echo "--- [$(date)] autossh 프로세스 종료. Exit Code: ${AUTOSSH_EXIT_CODE} ---"
+exit ${AUTOSSH_EXIT_CODE}
+

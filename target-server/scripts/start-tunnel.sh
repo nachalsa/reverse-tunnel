@@ -1,4 +1,6 @@
 #!/bin/bash
+export AUTOSSH_GATETIME=0
+
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 CONFIG_FILE="${SCRIPT_DIR}/../config/tunnel.conf"
 

@@ -17,19 +17,80 @@ middle-server/
   scripts/uninstall.sh            Middle Server 설정 제거
 
 target-server/
+  config/setup-all.conf.example   통합 설치/제거 설정 예시
   config/tunnel.conf.example      Target Server 터널 설정 예시
+  scripts/setup-all.sh            Target Server에서 Middle/Target을 한 번에 설정
   scripts/setup.sh                autossh, systemd, 키 등록 설정
   scripts/healthcheck.sh          Target Server 상태 점검
   scripts/start-tunnel.sh         systemd가 실행하는 터널 시작 스크립트
+  scripts/uninstall-all.sh        Target Server에서 Middle/Target을 한 번에 제거
   scripts/uninstall.sh            Target Server 설정 제거
   systemd/reverse-tunnel.service  systemd 서비스 템플릿
 ```
 
-`middle-server/config/middle.conf`와 `target-server/config/tunnel.conf`는 로컬 환경 설정 파일입니다. 저장소에는 예시 파일만 추적되며, 실제 설정 파일은 각 서버에서 `.example`을 복사해서 만듭니다.
+`middle-server/config/middle.conf`, `target-server/config/tunnel.conf`, `target-server/config/setup-all.conf`는 로컬 환경 설정 파일입니다. 저장소에는 예시 파일만 추적되며, 실제 설정 파일은 각 서버에서 `.example`을 복사해서 만듭니다.
+
+## 0. 통합 설치
+
+일반적인 경우에는 Target Server에서 통합 설치를 실행하는 방식을 권장합니다. 이 방식은 Target Server에서 Middle Server에 SSH로 접속해 Middle 설정을 먼저 적용한 뒤, 이어서 Target 설정을 적용합니다.
+
+Target Server에서 Middle Server 관리자 계정으로 SSH 접속 가능한 별칭을 준비합니다.
+
+```ssh-config
+Host hosting-server
+  HostName <middle-server-public-ip>
+  User <admin-user>
+```
+
+비밀번호 없이 접속되도록 공개키를 등록합니다.
+
+```bash
+ssh-copy-id hosting-server
+ssh hosting-server true
+```
+
+설정 파일을 준비합니다.
+
+```bash
+git clone https://github.com/nachalsa/reverse-tunnel.git
+cd reverse-tunnel
+
+cp middle-server/config/middle.conf.example middle-server/config/middle.conf
+cp target-server/config/tunnel.conf.example target-server/config/tunnel.conf
+cp target-server/config/setup-all.conf.example target-server/config/setup-all.conf
+
+nano middle-server/config/middle.conf
+nano target-server/config/tunnel.conf
+nano target-server/config/setup-all.conf
+```
+
+`setup-all.conf`의 `ADMIN_HOST_ALIAS`에는 위에서 만든 관리자 접속용 별칭을 입력합니다.
+
+```bash
+ADMIN_HOST_ALIAS="hosting-server"
+REMOTE_WORK_DIR="/tmp/reverse-tunnel-setup"
+RUN_MIDDLE_PROVISION="true"
+RUN_TARGET_SETUP="true"
+```
+
+통합 설치를 실행합니다.
+
+```bash
+sudo ./target-server/scripts/setup-all.sh
+```
+
+통합 설치는 내부적으로 다음 작업을 수행합니다.
+
+```text
+1. middle-server/ 파일을 Middle Server의 REMOTE_WORK_DIR로 복사
+2. Middle Server에서 sudo ./middle-server/scripts/provision.sh 실행
+3. Target Server에서 sudo ./target-server/scripts/setup.sh 실행
+4. /opt/reverse-tunnel/scripts/healthcheck.sh 실행
+```
 
 ## 1. Middle Server 설정
 
-Middle Server는 공인 IP가 있고 외부에서 SSH 접속 가능한 서버입니다.
+개별 실행이 필요할 때만 사용합니다. Middle Server는 공인 IP가 있고 외부에서 SSH 접속 가능한 서버입니다.
 
 ```bash
 git clone https://github.com/nachalsa/reverse-tunnel.git
@@ -57,7 +118,7 @@ ENABLE_UFW="false"
 
 ## 2. Target Server 설정
 
-Target Server는 사설망 내부에 있는 실제 접속 대상 서버입니다. 터널을 실행할 일반 사용자 계정으로 로그인한 뒤 진행합니다.
+개별 실행이 필요할 때만 사용합니다. Target Server는 사설망 내부에 있는 실제 접속 대상 서버입니다. 터널을 실행할 일반 사용자 계정으로 로그인한 뒤 진행합니다.
 
 먼저 Target Server에서 Middle Server 관리자 계정으로 SSH 접속 가능한 별칭을 준비합니다.
 
@@ -148,6 +209,14 @@ sudo sshd -T -C user=tunnel | grep -E '^(gatewayports|allowtcpforwarding) '
 Middle Server에서 터널 포트가 열려 있어도 Target Server의 실제 백엔드 서비스가 떠 있어야 최종 접속이 성공합니다. 예를 들어 `TUNNELS="8009:localhost:3389"`라면 Target Server에서 `localhost:3389`가 리슨 중이어야 RDP 접속이 됩니다. `healthcheck.sh`는 이 백엔드 연결 가능 여부도 함께 경고로 표시합니다.
 
 ## 5. 제거
+
+통합 설치를 사용했다면 Target Server에서 통합 제거를 실행할 수 있습니다.
+
+```bash
+sudo ./target-server/scripts/uninstall-all.sh
+```
+
+이 명령은 Target Server 설정을 먼저 제거한 뒤, Middle Server에 접속해 `middle-server/scripts/uninstall.sh`를 실행합니다.
 
 Target Server:
 

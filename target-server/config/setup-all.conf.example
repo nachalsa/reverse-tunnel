@@ -1,0 +1,40 @@
+# ==============================================================================
+# Target Server - 통합 설치/제거 설정 예시 파일
+# ==============================================================================
+#
+# 이 파일을 'setup-all.conf' 라는 이름으로 복사한 후, 본인의 환경에 맞게
+# 아래 항목들을 수정하여 사용하세요.
+#
+# 명령어: cp target-server/config/setup-all.conf.example target-server/config/setup-all.conf
+#
+# ------------------------------------------------------------------------------
+
+# [1. Middle Server 관리자 접속용 SSH alias]
+#
+# Target Server의 ~/.ssh/config에 정의된 관리자 접속용 Host 별칭입니다.
+# 이 계정은 Middle Server에서 sudo로 middle-server/scripts/provision.sh와
+# middle-server/scripts/uninstall.sh를 실행할 수 있어야 합니다.
+ADMIN_HOST_ALIAS="hosting-server"
+
+
+# ------------------------------------------------------------------------------
+
+# [2. Middle Server 임시 작업 디렉토리]
+#
+# setup-all.sh가 middle-server/ 디렉토리를 이 경로로 복사한 뒤 원격에서
+# provision.sh를 실행합니다. uninstall-all.sh도 같은 경로를 사용합니다.
+REMOTE_WORK_DIR="/tmp/reverse-tunnel-setup"
+
+
+# ------------------------------------------------------------------------------
+
+# [3. 실행 단계 선택]
+#
+# 일반적으로 true 그대로 사용합니다. 이미 Middle Server 설정을 따로 끝낸
+# 경우에만 RUN_MIDDLE_PROVISION=false로 둘 수 있습니다.
+RUN_MIDDLE_PROVISION="true"
+RUN_TARGET_SETUP="true"
+
+# uninstall-all.sh에서 사용할 제거 단계 선택입니다.
+RUN_TARGET_UNINSTALL="true"
+RUN_MIDDLE_UNINSTALL="true"

@@ -34,6 +34,25 @@ restart_ssh_service() {
     fi
 }
 
+stop_tunnel_user_processes() {
+    if ! id "${TUNNEL_USER}" &>/dev/null; then
+        return
+    fi
+
+    if ! pgrep -u "${TUNNEL_USER}" >/dev/null 2>&1; then
+        return
+    fi
+
+    echo "-> '${TUNNEL_USER}' 사용자의 남은 프로세스를 종료합니다..."
+    pkill -TERM -u "${TUNNEL_USER}" || true
+    sleep 2
+
+    if pgrep -u "${TUNNEL_USER}" >/dev/null 2>&1; then
+        pkill -KILL -u "${TUNNEL_USER}" || true
+        sleep 1
+    fi
+}
+
 # --- 메인 로직 ---
 echo "=== Middle Server 설정 제거 시작 ==="
 
@@ -91,6 +110,7 @@ fi
 # 4. 터널 전용 사용자 삭제
 echo -n "단계 3/3: '${TUNNEL_USER}' 사용자를 삭제합니다... "
 if id "${TUNNEL_USER}" &>/dev/null; then
+    stop_tunnel_user_processes
     deluser --remove-home "${TUNNEL_USER}" > /dev/null
     echo "성공!"
 else

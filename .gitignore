@@ -13,3 +13,4 @@
 # 로컬 환경 설정
 middle-server/config/middle.conf
 target-server/config/tunnel.conf
+target-server/config/setup-all.conf

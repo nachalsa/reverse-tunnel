@@ -148,7 +148,11 @@ PUBLIC_KEY_ESCAPED=$(printf '%q' "$PUBLIC_KEY_CONTENT")
 # ==============================================================================
 echo
 echo "--- [단계 2/7] SSH 설정 파일 자동 구성 ---"
-read -r -p "키 등록에 사용할 Middle Server의 '관리자 접속용 별칭(Host)'을 입력하세요: " ADMIN_HOST_ALIAS
+if [ -z "${ADMIN_HOST_ALIAS:-}" ]; then
+    read -r -p "키 등록에 사용할 Middle Server의 '관리자 접속용 별칭(Host)'을 입력하세요: " ADMIN_HOST_ALIAS
+else
+    echo "정보: 환경변수 ADMIN_HOST_ALIAS='${ADMIN_HOST_ALIAS}'를 사용합니다."
+fi
 
 if ! [[ "$ADMIN_HOST_ALIAS" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "오류: 관리자 접속용 별칭이 유효하지 않습니다."

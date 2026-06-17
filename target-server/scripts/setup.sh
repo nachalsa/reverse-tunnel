@@ -72,6 +72,45 @@ EOF
     done
 }
 
+ssh_host_exists() {
+    local alias="$1"
+    run_as_service_user grep -Eiq "^[[:space:]]*Host[[:space:]]+${alias}([[:space:]]|$)" "${USER_SSH_CONFIG}" 2>/dev/null
+}
+
+ssh_config_value() {
+    local config_dump="$1"
+    local key="$2"
+    printf '%s\n' "$config_dump" | awk -v key="$key" '$1 == key { print $2; exit }'
+}
+
+validate_existing_tunnel_host() {
+    local current_dump current_hostname current_user current_port current_identity
+
+    if ! current_dump=$(run_as_service_user ssh -F "${USER_SSH_CONFIG}" -G "${MIDDLE_SERVER_HOST_ALIAS}"); then
+        echo "오류: 기존 '${MIDDLE_SERVER_HOST_ALIAS}' SSH 설정을 읽을 수 없습니다."
+        exit 1
+    fi
+
+    current_hostname=$(ssh_config_value "$current_dump" "hostname")
+    current_user=$(ssh_config_value "$current_dump" "user")
+    current_port=$(ssh_config_value "$current_dump" "port")
+    current_identity=$(ssh_config_value "$current_dump" "identityfile")
+
+    if [ "$current_hostname" = "$ADMIN_HOSTNAME" ] &&
+       [ "$current_user" = "$MIDDLE_SERVER_TUNNEL_USER" ] &&
+       [ "$current_port" = "$ADMIN_PORT" ] &&
+       [ "$current_identity" = "$USER_TUNNEL_KEY" ]; then
+        echo "정보: SSH 설정 파일의 '${MIDDLE_SERVER_HOST_ALIAS}' 호스트 설정이 현재 설정과 일치합니다."
+        return
+    fi
+
+    echo "오류: SSH 설정 파일에 '${MIDDLE_SERVER_HOST_ALIAS}' 호스트가 이미 있지만 현재 설정과 다릅니다."
+    echo "      기존값: HostName=${current_hostname}, User=${current_user}, Port=${current_port}, IdentityFile=${current_identity}"
+    echo "      기대값: HostName=${ADMIN_HOSTNAME}, User=${MIDDLE_SERVER_TUNNEL_USER}, Port=${ADMIN_PORT}, IdentityFile=${USER_TUNNEL_KEY}"
+    echo "해결: '${USER_SSH_CONFIG}'에서 '${MIDDLE_SERVER_HOST_ALIAS}' Host 블록을 수정하거나 제거한 뒤 다시 실행하세요."
+    exit 1
+}
+
 echo "=== 역방향 SSH 터널 자동 설정 스크립트 ==="
 echo "정보: 터널 서비스는 '${SERVICE_USER}' 사용자의 권한으로 설정됩니다."
 
@@ -146,8 +185,8 @@ Host ${MIDDLE_SERVER_HOST_ALIAS}
 EOF
 )
 # 파일에 해당 Host 설정이 이미 있는지 확인 후 추가
-if run_as_service_user grep -qFx "Host ${MIDDLE_SERVER_HOST_ALIAS}" "${USER_SSH_CONFIG}" 2>/dev/null; then
-    echo "정보: SSH 설정 파일에 '${MIDDLE_SERVER_HOST_ALIAS}' 호스트 설정이 이미 존재하여 건너뜁니다."
+if ssh_host_exists "$MIDDLE_SERVER_HOST_ALIAS"; then
+    validate_existing_tunnel_host
 else
     echo "정보: SSH 설정 파일에 '${MIDDLE_SERVER_HOST_ALIAS}' 호스트 설정을 추가합니다..."
     run_as_service_user touch "${USER_SSH_CONFIG}" # 파일이 없을 경우 대비
@@ -217,7 +256,9 @@ mkdir -p "${INSTALL_DIR}/config"
 mkdir -p "${INSTALL_DIR}/scripts"
 cp "$CONFIG_FILE" "${INSTALL_DIR}/config/"
 cp "${PROJECT_ROOT}/scripts/start-tunnel.sh" "${INSTALL_DIR}/scripts/"
+cp "${PROJECT_ROOT}/scripts/healthcheck.sh" "${INSTALL_DIR}/scripts/"
 chmod +x "${INSTALL_DIR}/scripts/start-tunnel.sh"
+chmod +x "${INSTALL_DIR}/scripts/healthcheck.sh"
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "${INSTALL_DIR}"
 echo "--- [단계 7/7] Systemd 서비스 등록 및 시작..."
 sed "s/__PLACEHOLDER_USER__/${SERVICE_USER}/g" "${PROJECT_ROOT}/systemd/reverse-tunnel.service" > /etc/systemd/system/reverse-tunnel.service

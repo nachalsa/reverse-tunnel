@@ -19,6 +19,7 @@ middle-server/
 target-server/
   config/tunnel.conf.example      Target Server 터널 설정 예시
   scripts/setup.sh                autossh, systemd, 키 등록 설정
+  scripts/healthcheck.sh          Target Server 상태 점검
   scripts/start-tunnel.sh         systemd가 실행하는 터널 시작 스크립트
   scripts/uninstall.sh            Target Server 설정 제거
   systemd/reverse-tunnel.service  systemd 서비스 템플릿
@@ -131,7 +132,10 @@ Target Server:
 ```bash
 systemctl status reverse-tunnel.service
 journalctl -u reverse-tunnel.service -f
+./target-server/scripts/healthcheck.sh
 ```
+
+설치 후에는 `/opt/reverse-tunnel/scripts/healthcheck.sh`로도 같은 점검을 실행할 수 있습니다.
 
 Middle Server:
 
@@ -140,6 +144,8 @@ ss -tlnp | grep 22222
 sudo ufw status verbose
 sudo sshd -T -C user=tunnel | grep -E '^(gatewayports|allowtcpforwarding) '
 ```
+
+Middle Server에서 터널 포트가 열려 있어도 Target Server의 실제 백엔드 서비스가 떠 있어야 최종 접속이 성공합니다. 예를 들어 `TUNNELS="8009:localhost:3389"`라면 Target Server에서 `localhost:3389`가 리슨 중이어야 RDP 접속이 됩니다. `healthcheck.sh`는 이 백엔드 연결 가능 여부도 함께 경고로 표시합니다.
 
 ## 5. 제거
 

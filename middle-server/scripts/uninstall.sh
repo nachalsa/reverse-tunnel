@@ -60,11 +60,10 @@ else
         echo "-> 삭제할 터널 포트 목록이 없습니다. 건너뜁니다."
     else
         for port in $TUNNEL_PORTS_TO_OPEN; do
-            if ufw status | grep -qw "${port}/tcp"; then
-                 ufw delete allow "${port}/tcp" > /dev/null
+            if ufw delete allow "${port}/tcp" > /dev/null 2>&1; then
                  echo "-> 포트 ${port}/tcp 규칙을 삭제했습니다."
             else
-                 echo "-> 포트 ${port}/tcp 규칙이 이미 없습니다. 건너뜁니다."
+                 echo "-> 포트 ${port}/tcp 규칙이 없거나 삭제할 수 없습니다. 건너뜁니다."
             fi
         done
     fi

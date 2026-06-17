@@ -38,14 +38,29 @@ fi
 echo "Starting reverse SSH tunnel to ${MIDDLE_SERVER_TUNNEL_USER}@${MIDDLE_SERVER_HOST_ALIAS}..."
 echo "Tunnels: ${TUNNELS}"
 
+AUTOSSH_PID=""
+
+stop_tunnel() {
+    if [ -n "$AUTOSSH_PID" ] && kill -0 "$AUTOSSH_PID" 2>/dev/null; then
+        kill -TERM "$AUTOSSH_PID" 2>/dev/null || true
+        wait "$AUTOSSH_PID" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+trap stop_tunnel TERM INT
+
 # autossh 실행
 # -o "StrictHostKeyChecking=accept-new": 처음 접속 시 키를 자동으로 추가. 이후 키 변경 시 경고. (보안 강화)
 # -o "ConnectTimeout=10": 연결 시도 시 10초 타임아웃 설정
-exec /usr/bin/autossh -M 0 \
+/usr/bin/autossh -M 0 \
     -o "ServerAliveInterval=30" \
     -o "ServerAliveCountMax=3" \
     -o "ExitOnForwardFailure=yes" \
     -o "ConnectTimeout=10" \
     -o "StrictHostKeyChecking=accept-new" \
     -N "${SSH_REMOTE_OPTIONS[@]}" \
-    "${MIDDLE_SERVER_TUNNEL_USER}@${MIDDLE_SERVER_HOST_ALIAS}"
+    "${MIDDLE_SERVER_TUNNEL_USER}@${MIDDLE_SERVER_HOST_ALIAS}" &
+
+AUTOSSH_PID=$!
+wait "$AUTOSSH_PID"

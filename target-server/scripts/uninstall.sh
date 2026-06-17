@@ -9,8 +9,7 @@
 # ==============================================================================
 
 # --- 스크립트 기본 설정 ---
-set -e
-set -o pipefail
+set -euo pipefail
 
 # --- 사전 검증 ---
 if [ "$(id -u)" -ne 0 ]; then
@@ -21,6 +20,7 @@ fi
 # --- 변수 정의 ---
 INSTALL_DIR="/opt/reverse-tunnel"
 SERVICE_FILE_TARGET="/etc/systemd/system/reverse-tunnel.service"
+REMOVE_AUTOSSH="${REMOVE_AUTOSSH:-false}"
 
 # --- 메인 로직 ---
 echo "=== 역방향 SSH 터널 설정 제거 시작 ==="
@@ -48,14 +48,19 @@ else
 fi
 
 # 3. 의존성 패키지 삭제
-echo "단계 3/3: 의존성 패키지(autossh)를 삭제합니다..."
-# 'dpkg -s'를 사용하여 패키지 설치 여부 확인
-if dpkg -s autossh &> /dev/null; then
-    apt-get purge -y autossh
-    apt-get autoremove -y # 다른 불필요한 의존성도 함께 제거
-    echo "-> 'autossh' 패키지를 완전히 삭제했습니다."
+echo "단계 3/3: 의존성 패키지(autossh) 처리..."
+if [ "$REMOVE_AUTOSSH" = "true" ]; then
+    # 'dpkg -s'를 사용하여 패키지 설치 여부 확인
+    if dpkg -s autossh &> /dev/null; then
+        apt-get purge -y autossh
+        apt-get autoremove -y # 다른 불필요한 의존성도 함께 제거
+        echo "-> 'autossh' 패키지를 완전히 삭제했습니다."
+    else
+        echo "-> 'autossh' 패키지가 설치되어 있지 않습니다. 건너뜁니다."
+    fi
 else
-    echo "-> 'autossh' 패키지가 설치되어 있지 않습니다. 건너뜁니다."
+    echo "-> 'autossh' 패키지는 삭제하지 않았습니다."
+    echo "-> 패키지까지 삭제하려면 REMOVE_AUTOSSH=true sudo -E ./uninstall.sh 로 실행하세요."
 fi
 
 echo "============================================="

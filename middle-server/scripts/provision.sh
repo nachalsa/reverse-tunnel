@@ -22,7 +22,9 @@ fi
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 CONFIG_FILE="${SCRIPT_DIR}/../config/middle.conf"
 SSHD_CONFIG_FILE="/etc/ssh/sshd_config"
-SSHD_CONFIG_MARKER="# Reverse Tunneling을 위해 추가된 설정 (by provision.sh)"
+SSHD_CONFIG_BEGIN_MARKER="# BEGIN reverse-tunnel managed block"
+SSHD_CONFIG_END_MARKER="# END reverse-tunnel managed block"
+SSHD_CONFIG_LEGACY_MARKER="# Reverse Tunneling을 위해 추가된 설정 (by provision.sh)"
 
 restart_ssh_service() {
     if systemctl list-unit-files ssh.service 2>/dev/null | grep -q '^ssh.service'; then
@@ -64,6 +66,12 @@ validate_required_config() {
         exit 1
     fi
 
+    ENABLE_UFW="${ENABLE_UFW:-false}"
+    if [ "$ENABLE_UFW" != "true" ] && [ "$ENABLE_UFW" != "false" ]; then
+        echo "오류: ENABLE_UFW 값은 true 또는 false 여야 합니다."
+        exit 1
+    fi
+
     local port
     for port in $TUNNEL_PORTS_TO_OPEN; do
         if ! validate_port "$port"; then
@@ -97,16 +105,25 @@ else
 fi
 
 # 3. SSH 서버 설정 (GatewayPorts)
-echo -n "단계 2/3: SSH 설정 파일(${SSHD_CONFIG_FILE})에 'GatewayPorts yes'를 설정합니다... "
-if grep -qE "^[[:space:]]*GatewayPorts[[:space:]]+yes" "$SSHD_CONFIG_FILE"; then
+echo -n "단계 2/3: SSH 설정 파일(${SSHD_CONFIG_FILE})에 터널 사용자 전용 GatewayPorts 설정을 추가합니다... "
+if grep -q "^${SSHD_CONFIG_BEGIN_MARKER}$" "$SSHD_CONFIG_FILE"; then
     echo "이미 설정되어 있습니다. 건너뜁니다."
 else
     SSHD_CONFIG_BACKUP="${SSHD_CONFIG_FILE}.bak.$(date +%Y%m%d%H%M%S)"
     cp "$SSHD_CONFIG_FILE" "$SSHD_CONFIG_BACKUP"
+
+    if grep -q "^${SSHD_CONFIG_LEGACY_MARKER}$" "$SSHD_CONFIG_FILE"; then
+        sed -i "/^${SSHD_CONFIG_LEGACY_MARKER}$/d" "$SSHD_CONFIG_FILE"
+        sed -i '/^GatewayPorts yes$/d' "$SSHD_CONFIG_FILE"
+    fi
+
     {
         echo ""
-        echo "$SSHD_CONFIG_MARKER"
-        echo "GatewayPorts yes"
+        echo "$SSHD_CONFIG_BEGIN_MARKER"
+        echo "Match User ${TUNNEL_USER}"
+        echo "    AllowTcpForwarding remote"
+        echo "    GatewayPorts yes"
+        echo "$SSHD_CONFIG_END_MARKER"
     } >> "$SSHD_CONFIG_FILE"
 
     if ! sshd -t -f "$SSHD_CONFIG_FILE"; then
@@ -140,12 +157,15 @@ else
              echo "-> 포트 ${port}/tcp 를 허용했습니다."
         fi
     done
-    
+
     if ufw status | grep -q "Status: active"; then
         echo "-> 방화벽(ufw)은 이미 활성화되어 있습니다."
-    else
+    elif [ "${ENABLE_UFW}" = "true" ]; then
         echo "y" | ufw enable
         echo "-> 방화벽(ufw)을 활성화했습니다."
+    else
+        echo "-> 방화벽(ufw)이 비활성 상태입니다. 규칙만 추가하고 활성화하지 않았습니다."
+        echo "-> 활성화하려면 middle.conf에서 ENABLE_UFW=\"true\"로 설정한 뒤 다시 실행하세요."
     fi
 fi
 

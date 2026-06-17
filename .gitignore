@@ -9,3 +9,7 @@
 # 로그 및 임시 파일
 *.log
 /tmp
+
+# 로컬 환경 설정
+middle-server/config/middle.conf
+target-server/config/tunnel.conf

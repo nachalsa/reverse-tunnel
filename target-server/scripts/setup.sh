@@ -210,8 +210,8 @@ fi
 # ==============================================================================
 echo
 echo "--- [단계 5/7] 의존성 패키지(autossh) 설치..."
-apt-get update > /dev/null
-apt-get install -y autossh
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update > /dev/null
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y autossh
 echo "--- [단계 6/7] 관련 파일 복사 및 권한 설정..."
 mkdir -p "${INSTALL_DIR}/config"
 mkdir -p "${INSTALL_DIR}/scripts"

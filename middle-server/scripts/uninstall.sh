@@ -23,7 +23,6 @@ CONFIG_FILE="${SCRIPT_DIR}/../config/middle.conf"
 SSHD_CONFIG_FILE="/etc/ssh/sshd_config"
 SSHD_CONFIG_BEGIN_MARKER="# BEGIN reverse-tunnel managed block"
 SSHD_CONFIG_END_MARKER="# END reverse-tunnel managed block"
-SSHD_CONFIG_LEGACY_MARKER="# Reverse Tunneling을 위해 추가된 설정 (by provision.sh)"
 
 restart_ssh_service() {
     if systemctl list-unit-files ssh.service 2>/dev/null | grep -q '^ssh.service'; then
@@ -77,26 +76,6 @@ if grep -q "^${SSHD_CONFIG_BEGIN_MARKER}$" "$SSHD_CONFIG_FILE"; then
     SSHD_CONFIG_BACKUP="${SSHD_CONFIG_FILE}.bak.$(date +%Y%m%d%H%M%S)"
     cp "$SSHD_CONFIG_FILE" "$SSHD_CONFIG_BACKUP"
     sed -i "/^${SSHD_CONFIG_BEGIN_MARKER}$/,/^${SSHD_CONFIG_END_MARKER}$/d" "$SSHD_CONFIG_FILE"
-    if grep -q "^${SSHD_CONFIG_LEGACY_MARKER}$" "$SSHD_CONFIG_FILE"; then
-        sed -i "/^${SSHD_CONFIG_LEGACY_MARKER}$/d" "$SSHD_CONFIG_FILE"
-        sed -i '/^GatewayPorts yes$/d' "$SSHD_CONFIG_FILE"
-    fi
-
-    if ! sshd -t -f "$SSHD_CONFIG_FILE"; then
-        cp "$SSHD_CONFIG_BACKUP" "$SSHD_CONFIG_FILE"
-        echo "실패! sshd 설정 검증에 실패하여 백업으로 복구했습니다: ${SSHD_CONFIG_BACKUP}"
-        exit 1
-    fi
-
-    restart_ssh_service
-    echo "성공! (sshd 재시작됨)"
-elif grep -q "^${SSHD_CONFIG_LEGACY_MARKER}$" "$SSHD_CONFIG_FILE"; then
-    # 만일의 사태를 대비해 백업
-    SSHD_CONFIG_BACKUP="${SSHD_CONFIG_FILE}.bak.$(date +%Y%m%d%H%M%S)"
-    cp "$SSHD_CONFIG_FILE" "$SSHD_CONFIG_BACKUP"
-    # sed를 사용하여 추가했던 주석과 설정 라인을 삭제
-    sed -i "/^${SSHD_CONFIG_LEGACY_MARKER}$/d" "$SSHD_CONFIG_FILE"
-    sed -i '/^GatewayPorts yes$/d' "$SSHD_CONFIG_FILE"
 
     if ! sshd -t -f "$SSHD_CONFIG_FILE"; then
         cp "$SSHD_CONFIG_BACKUP" "$SSHD_CONFIG_FILE"

@@ -24,7 +24,6 @@ CONFIG_FILE="${SCRIPT_DIR}/../config/middle.conf"
 SSHD_CONFIG_FILE="/etc/ssh/sshd_config"
 SSHD_CONFIG_BEGIN_MARKER="# BEGIN reverse-tunnel managed block"
 SSHD_CONFIG_END_MARKER="# END reverse-tunnel managed block"
-SSHD_CONFIG_LEGACY_MARKER="# Reverse Tunneling을 위해 추가된 설정 (by provision.sh)"
 
 restart_ssh_service() {
     if systemctl list-unit-files ssh.service 2>/dev/null | grep -q '^ssh.service'; then
@@ -111,11 +110,6 @@ if grep -q "^${SSHD_CONFIG_BEGIN_MARKER}$" "$SSHD_CONFIG_FILE"; then
 else
     SSHD_CONFIG_BACKUP="${SSHD_CONFIG_FILE}.bak.$(date +%Y%m%d%H%M%S)"
     cp "$SSHD_CONFIG_FILE" "$SSHD_CONFIG_BACKUP"
-
-    if grep -q "^${SSHD_CONFIG_LEGACY_MARKER}$" "$SSHD_CONFIG_FILE"; then
-        sed -i "/^${SSHD_CONFIG_LEGACY_MARKER}$/d" "$SSHD_CONFIG_FILE"
-        sed -i '/^GatewayPorts yes$/d' "$SSHD_CONFIG_FILE"
-    fi
 
     {
         echo ""
